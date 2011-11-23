@@ -27,7 +27,7 @@ class ZerigoDns(object):
 
     def _hostname(self, fqdn):
         assert fqdn.endswith(self.zone)
-        hostname = fqdn[:-len(self.zone)]
+        return fqdn[:-len(self.zone)]
     
     def getARecords(self, fqdn):
         hostname = self._hostname(fqdn)
@@ -149,7 +149,7 @@ def boundedCheck(target, check, timer, logger):
                 exit(0)
             else:
                 exit(1)
-        except:
+        except Exception:
             exit(2)
         
 
@@ -178,7 +178,7 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
             exit(-1)
         logger.debug('self-check passed')
         logger.debug('getting DNS records')
-        records = dns.getARecords()
+        records = dns.getARecords(fqdn)
         if ownAddr not in records:
             logger.info('adding myself into DNS')
             dns.addARecord(fqdn, ownAddr)
