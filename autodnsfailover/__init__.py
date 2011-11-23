@@ -209,8 +209,9 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
         logger.debug('getting DNS records')
         records = dns.getARecords(fqdn)
         if ownAddr not in records:
-            logger.info('adding myself into DNS')
+            logger.info('adding myself ({0}) into DNS'.format(ownAddr))
             dns.addARecord(fqdn, ownAddr)
+            logger.warning('added myself ({0}) into DNS'.format(ownAddr))
         logger.debug('checking other peers')
         for otherAddr in records:
             if not boundedCheck(otherAddr, check, timer, logger):
