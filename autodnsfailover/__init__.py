@@ -51,7 +51,10 @@ class ZerigoDns(object):
 
 
 class WhatIsMyAddr(object):
-
+    """
+    Find our local IP address by querying a remote site. The site should
+    just return the IP address by itself.
+    """
     def __init__(self, url='http://myip.enix.org/REMOTE_ADDR'):
         self.url = url
 
@@ -60,7 +63,9 @@ class WhatIsMyAddr(object):
 
 
 class HttpCheck(object):
-
+    """
+    Check that a given HTTP test request can be done correctly.
+    """
     def __init__(self, method='GET', url='/', body=None, headers={},
                  port=80, validStatusCodes=[200,302]):
         self.method = method
@@ -81,6 +86,11 @@ class HttpCheck(object):
 
 
 class TickTimer(object):
+    """
+    Schedule a check to be executed every *interval* seconds.
+    If the check has not returned after *timeout* seconds, kill it.
+    The *timeout* is fixed.
+    """
 
     def __init__(self, interval, timeout):
         self.interval = interval
@@ -106,6 +116,16 @@ class TickTimer(object):
 
 
 def boundedCheck(target, check, timer, logger):
+    """
+    Execute the given *check* on the given *target* (*target* should be an
+    IP address). The *timer* is used to retrieve the timeout, and useful
+    information will be sent using the *logger*.
+
+    This function will fork(), and the check will be executed in the child
+    process. The parent process will wait for the child process, and kill
+    it if it did not answer within the timeout specified by the *timer*
+    implementation.
+    """
     timeout = timer.getCheckTimeout()
     deadline = time.time() + timeout
     logger.debug('starting check {0} on {1}, timeout={2}'
@@ -155,6 +175,12 @@ def boundedCheck(target, check, timer, logger):
         
 
 def run(fqdn, ipaddr, dns, check, timer, logger):
+    """
+    This is the "main loop". It will repeatedly retrieve our public
+    IP address (it does it each time, in case it changed - this can
+    happen with EC2 elastic IPs), add it to the DNS, then check
+    that the machines pointed by the other DNS records are fine.
+    """
     logger.info('autodnsfailover starting')
     ownAddr = None
     while True:
@@ -175,7 +201,9 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
             logger.info('my IP address seems to be {0}'.format(ownAddr))
         logger.debug('doing self-check')
         if not boundedCheck(ownAddr, check, timer, logger):
-            logger.critical('self-check failed, exitting')
+            logger.critical('self-check failed; waiting 60s and exitting')
+            # Don't restart immediately, to avoid a burst of error messages
+            time.sleep(60)
             exit(-1)
         logger.debug('self-check passed')
         logger.debug('getting DNS records')
