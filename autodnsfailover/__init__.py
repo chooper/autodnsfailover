@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import errno
 import httplib
 import os
 import select
@@ -105,6 +106,7 @@ class TickTimer(object):
 
 def boundedCheck(target, check, timer, logger):
     timeout = timer.getCheckTimeout()
+    deadline = time.time() + timeout
     logger.debug('starting check {0} on {1}, timeout={2}'
                  .format(check, target, timeout))
     # Use self-pipe trick: setup a SIGCHLD handler to write 1 byte to a pipe
@@ -116,24 +118,30 @@ def boundedCheck(target, check, timer, logger):
     pid = os.fork()
     if pid:
         # parent process: wait for the child
-        rfds, wfds, efds = select.select([pipe[0]],[],[],timeout)
-        if rfds:
-            # something in the pipe = got a SIGCHLD
-            logger.debug('child exited, retrieving its status')
-            childpid, status = os.wait()
-            logger.debug('child exit status={0}'.format(status))
-            retval = (status==0)
-        else:
-            # timeout
-            logger.warning('child timeout, killing it')
-            os.kill(pid, signal.SIGKILL)
-            logger.debug('reaping child process')
-            os.wait()
-            retval = False
-        os.close(pipe[0])
-        os.close(pipe[1])
-        logger.debug('check result is {0}'.format(retval))
-        return retval
+        while time.time() < deadline:
+            timeout = max(0, deadline - time.time())
+            try:
+                rfds, wfds, efds = select.select([pipe[0]],[],[],timeout)
+            except select.error as err:
+                if err.args[0] == errno.EINTR:
+                    continue
+            if rfds:
+                # something in the pipe = got a SIGCHLD
+                logger.debug('child exited, retrieving its status')
+                childpid, status = os.wait()
+                logger.debug('child exit status={0}'.format(status))
+                retval = (status==0)
+            else:
+                # timeout
+                logger.warning('child timeout, killing it')
+                os.kill(pid, signal.SIGKILL)
+                logger.debug('reaping child process')
+                os.wait()
+                retval = False
+            os.close(pipe[0])
+            os.close(pipe[1])
+            logger.debug('check result is {0}'.format(retval))
+            return retval
     else:
         # child process: do the check
         try:
