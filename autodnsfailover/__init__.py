@@ -26,8 +26,9 @@ class ZerigoDns(object):
         return zerigodns.NSZone(self.user, self.key).find_by_domain(self.zone)
 
     def _hostname(self, fqdn):
-        assert fqdn.endswith(self.zone)
-        return fqdn[:-len(self.zone)]
+        zone = '.' + self.zone
+        assert fqdn.endswith(zone)
+        return fqdn[:-len(zone)]
     
     def getARecords(self, fqdn):
         hostname = self._hostname(fqdn)
