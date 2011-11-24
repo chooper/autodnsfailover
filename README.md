@@ -4,6 +4,20 @@ This is a little Python script to automatically update DNS records for a bunch o
 
 It tries to be very modular, so each basic feature is isolated in a separate class. This allows to replace e.g. the "are you alive" check with your own specific implementation, hopefully as cleanly as possible.
 
+# How it works
+
+Suppose you have a DNS round-robin setup involving three web servers, with the following DNS information:
+
+    www.example.com A 1.1.1.1
+    www.example.com A 1.1.1.2
+    www.example.com A 1.1.1.3
+
+You will run the autodnsfailover daemon on all three servers. When the daemon starts, it will make sure that the record for the server it's running on is present in the DNS. Then, it will check all the servers in the DNS (including itself). If one is found to be failing, it will be removed from the DNS.
+
+With the configuration described above, if you add a 4th server (with IP address 1.1.1.4), you don't have anything special to do. The new server will also run the autodnsfailover daemon, so it will automatically add the relevant DNS record. If at some point you stop one of the servers, the other servers will detect that and remove its DNS record.
+
+Of course, your DNS record TTL should be as low as possible, to make sure that failed servers removal is seen as soon as possible by the rest of the world.
+
 # How to use it
 
 You will need:
@@ -13,6 +27,17 @@ You will need:
 * to arrange this script to be run automatically, and restarted automatically (it will exit when it fails to check itself correctly).
 
 Since our servers all have a Supervisor infrastructure, we manage the autodnsfailover daemon with a small supervisord.conf snippet, but you could also use e.g. start-stop-daemon or whatever you like. The script stays in foreground by default.
+
+# Safe guards
+
+If for some reason, the check logic itself is broken, you could end up in a situation where each peer removes the others, leaving you with zero server in the round robin. Doing proper synchronization and locking over DNS records is probably risky business. So, to avoid problems, autodnsfailover implements the following policy:
+
+* before checking other peers, it does a self-check, and if the self-check fails, it aborts;
+* peers are sorted before being checked, to make sure that the checks will happen in the same order on all hosts;
+* when a peer is found to be dead, it is removed, but the daemon will then start over the full loop: it will do a self-check before checking other hosts;
+* if there is only one record, it won't be removed.
+
+This is not 100% bullet-proof (there are scenarios where a bad timing could cause peers to remove each others) but it should at least prevent basic fsck-ups.
 
 # Interfaces
 

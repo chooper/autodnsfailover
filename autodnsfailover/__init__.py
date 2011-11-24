@@ -213,10 +213,20 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
             dns.addARecord(fqdn, ownAddr)
             logger.warning('added myself ({0}) into DNS'.format(ownAddr))
         logger.debug('checking other peers')
-        for otherAddr in records:
+        # Make sure that all peers check each others in the same order
+        # (to avoid a race condition where all peers could be removed
+        # simultaneously if something is wrong in the check logic itself)
+        for otherAddr in sorted(records):
             if not boundedCheck(otherAddr, check, timer, logger):
-                logger.warning('peer {0} seems dead, removing it from DNS'
-                               .format(otherAddr))
-                dns.delARecord(fqdn, otherAddr)
+                if len(records)<2:
+                    logger.warning('peer {0} seems dead, but it will not '
+                                   'be removed since it is the last peer'
+                                   .format(otherAddr))
+                else:
+                    logger.warning('peer {0} seems dead, removing it from DNS '
+                                   .format(otherAddr))
+                    dns.delARecord(fqdn, otherAddr)
+                    # Only remove one peer at a time; then force a self-check
+                    break
             else:
                 logger.debug('peer {0} seems alive'.format(otherAddr))
