@@ -1,95 +1,116 @@
-# DNS
+# autodnsfailover
 
-## Interface
+This is a little Python script to automatically update DNS records for a bunch of servers participating in a [Round-Robin DNS setup](http://en.wikipedia.org/wiki/Round-robin_DNS).
 
-A class implementing the DNS interface must provide the following methods:
+It tries to be very modular, so each basic feature is isolated in a separate class. This allows to replace e.g. the "are you alive" check with your own specific implementation, hopefully as cleanly as possible.
 
-* getARecords(fqdn): return a list of all IP addresses associated with
-  the given FQDN.
+# How to use it
+
+You will need:
+
+* a Zerigo account with your DNS zones (or to write an appropriate "DNS" class implementation to dynamically update your DNS records);
+* to write a script (see the sample.py script for an example), with your credentials, the name of the DNS entry to update, and a few other details;
+* to arrange this script to be run automatically, and restarted automatically (it will exit when it fails to check itself correctly).
+
+Since our servers all have a Supervisor infrastructure, we manage the autodnsfailover daemon with a small supervisord.conf snippet, but you could also use e.g. start-stop-daemon or whatever you like. The script stays in foreground by default.
+
+# Interfaces
+
+The interfaces marked "TBD" are not implemented, but we acknowledge that they would probably be very useful to others, and that they should be pretty straightforward to implement.
+
+## DNS
+
+The DNS interface is responsible for updating the DNS records. A class implementing the DNS interface must provide the following methods:
+
+* getARecords(fqdn): return a list of all IP addresses associated with the given FQDN.
 * addARecord(fqdn,a): add a new A record for the given FQDN.
 * delARecord(fqdn,a): delete the A record for the given FQDN.
 
-The constructor will typically be implementation-dependent, and allow
-to set the credentials and/or the zone to act upon.
+The constructor will typically be implementation-dependent, and allow to set the credentials and/or the zone to act upon.
 
-## Zerigo
+### Zerigo
 
-ZerigoDns is the reference class for this interface.
+ZerigoDns is the reference class for this interface. It is useful only if your zones are hosted by [Zerigo](http://www.zerigo.com/managed-dns). It will use the Zerigo API to list, add, and remove, DNS records.
 
-## Boto
+### Boto
 
-A boto implementation (allowing to update records located on AWS Route53)
-could be useful, but the current interface is still a bit rough (it involves
-generating queries directly in XML).
+TBD.
 
-# IP Address
+A boto implementation (allowing to update records located on AWS Route53) could be useful, but the current interface is still a bit rough (it involves generating queries directly in XML).
 
-## Interface
+### DDNS
 
-A class implementing the IP address discovery interface must provide a
-getOwnAddr() method, returning the IP address of the current host.
+TBD.
 
-## myip.enix.org
+Dynamic DNS (with DNSSEC or something like that) could also be interesting. Feel free to contribute an implementation if you need it :-)
 
-The reference implementation makes a call to http://myip.enix.org/REMOTE_ADDR
-to find out the public IP address of the currnet host.
+## IP Address
 
-This method relies on an external service (which is bad). However, it is
-probably the one that works on the greatest number of servers (except those
-who can't resolve DNS, or can't connect outside, or use a different path
-for outgoing and incoming traffic, e.g. a HTTP proxy).
+The IP address class is just used to retrieve our own IP address. While this might sound obvious ("just parse the output of ifconfig!"), it is actually a little bit more complex. An increasing number of infrastructure providers don't allocate a public IP address to your server. On Amazon EC2, for instance, your instance has a private IP address. Retrieving the public IP address requires some extra work.
 
-## EC2
+A class implementing the IP address discovery interface must just provide a getOwnAddr() method, returning the IP address of the current host.
 
-When running on EC2, it would be reasonable to directly check EC2 meta-data,
-e.g. on http://169.254.169.254/latest/meta-data/public-ipv4.
+### WhatIsMyAddr
 
-## ifconfig
+The reference implementation makes a call to a remote URL to find out the public IP address of the current host.
 
-Invoking ifconfig and parsing the output would probably work on some
-Linux/UNIX variants.
+This method relies on an external service (which is bad). However, it is probably the one that works on the greatest number of servers (except those who can't resolve DNS, or can't connect outside, or use a different path for outgoing and incoming traffic, e.g. a HTTP proxy).
 
-# Check
+By default, it will use http://myip.enix.org/REMOTE_ADDR. If you are on EC2, you can use http://169.254.169.254/latest/meta-data/public-ipv4 instead.
 
-A class implementing the check interface must provide a single check(ipaddr)
-method. The method should check the server running at the given IP address,
-and return True (if it works) or False (if it doesn't).
+### ifconfig
 
-The check does not have to bother about timeouts: the main script
-will run the check in a subprocess and kill it if it takes too long
-to complete.
+TBD
 
-## HTTP
+Invoking ifconfig and parsing the output would probably work on some Linux/UNIX variants. Since this code was initially written to run on EC2, the plugin is not implemented yet, however!
 
-The default implementation does a HTTP check. The constructor allows
-to specify optional method, url, body, headers, port, and a list
-of valid status codes. The defaults should be fine for most use cases.
+## Check
 
-## ICMP
+The check class does a "are you alive?" verification. It must provide a single method, check(ipaddr). The method should check the server running at the given IP address, and return True (if it works) or False (if it doesn't).
+
+If the check must call an external program, it can call a subprocess, but it's even better to directly exec() the external program: the main check will be executed in a forked process anyway, to make sure that any issue with the check function won't harm the main program. If you exec() in the check(), the exit status will be used to indicate success or failure, with a return code of zero and non-zero.
+
+Since the main script runs the check in a subprocess, the check code does not have to bother about timeouts: it will be killed (and considered as failed) if it takes too long to complete.
+
+### HTTP
+
+The default implementation does a HTTP check. The constructor allows to specify optional method, url, body, headers, port, and a list of valid status codes. The defaults should be fine for most use cases.
+
+### ICMP
+
+TBD
 
 It would be sensible to provide a simple ICMP check.
 
-## TCP
+### TCP
+
+TBD
 
 There would be two use-cases where a TCP check would be better than a ICMP
 check:
 
-* ICMP is filtered, and you just want to make sure that this SSH or Apache
-  process is still listening on port 22 or 80 to see if the machine is still
-  up;
-* the mission-critical process is prone to crashes, and it's not a web
-  server (otherwise, the HTTP check would be probably better).
+* ICMP is filtered, and you just want to make sure that this SSH or Apache process is still listening on port 22 or 80 to see if the machine is still up;
+* the mission-critical process is prone to crashes, and it's not a web server (otherwise, the HTTP check would be probably better).
 
-# Timer
+## Timer
 
-The timer schedules the checks. It must expose two methods:
+The timer schedules the checks: how often they should be run, and what should be the timeout. It must expose two methods:
 
-* getNextCheckTime(): returns the UNIX timestamp at which the next check
-  should be executed;
-* getCheckTimeout(): returns the time alloted to the check to execute
-  (once this time is elapsed, the check is considered as failed).
+* getNextCheckTime(): returns the UNIX timestamp at which the next check should be executed;
+* getCheckTimeout(): returns the time alloted to the check to execute (once this time is elapsed, the check is considered as failed).
 
-## TickTimer
+### TickTimer
 
-This implementation schedules a check at regular intervals with a fixed
-timeout.
+This implementation schedules a check at regular intervals with a fixed timeout.
+
+## Logger
+
+The code uses a logger compatible with the Python logging module. To get a full log of every event on stdout/stderr, you can use the following logger:
+
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger('autodnsfailover')
+
+We recommend checking the [Python Logging Tutorial](http://docs.python.org/howto/logging.html#logging-basic-tutorial); in our production setup, we use it to:
+
+* add timestamps to the logs,
+* mail to our ops team all messages with a priority equal or above WARNING.
