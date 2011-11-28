@@ -44,7 +44,7 @@ class ZerigoDns(object):
         hostname = self._hostname(fqdn)
         for host in self._zone.find_by_hostname(hostname):
             try:
-                if host.host_type == 'A':
+                if host.host_type == 'A' and host.data == a:
                     host.destroy()
             except zerigodns.ZerigoNotFound:
                 pass
