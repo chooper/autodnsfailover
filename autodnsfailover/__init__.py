@@ -154,7 +154,7 @@ def boundedCheck(target, check, timer, logger):
                 retval = (status==0)
             else:
                 # timeout
-                logger.warning('child timeout, killing it')
+                logger.info('child timeout, killing it')
                 os.kill(pid, signal.SIGKILL)
                 logger.debug('reaping child process')
                 os.wait()
@@ -208,6 +208,7 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
         logger.debug('self-check passed')
         logger.debug('getting DNS records')
         records = dns.getARecords(fqdn)
+        logger.debug('DNS records: {0}'.format(records))
         if ownAddr not in records:
             logger.info('adding myself ({0}) into DNS'.format(ownAddr))
             dns.addARecord(fqdn, ownAddr)
