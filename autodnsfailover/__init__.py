@@ -186,12 +186,12 @@ def retryBoundedCheck(target, check, timer, logger):
             # Success!
             if failed:
                 # If there were previous failures, log them.
-                logger.info('Check failed {0} time(s) before passing.'
+                logger.warning('Check failed {0} time(s) before passing.'
                             .format(failed))
             return True
         failed += 1
         if failed >= retry:
-            logger.info('Check failed {0} times. Giving up.'
+            logger.warning('Check failed {0} times. Giving up.'
                         .format(failed))
             return False
         
@@ -242,12 +242,12 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
         for otherAddr in sorted(records):
             if not retryBoundedCheck(otherAddr, check, timer, logger):
                 if len(records)<2:
-                    logger.warning('peer {0} seems dead, but it will not '
-                                   'be removed since it is the last peer'
-                                   .format(otherAddr))
+                    logger.error('peer {0} seems dead, but it will not '
+                                 'be removed since it is the last peer'
+                                 .format(otherAddr))
                 else:
-                    logger.warning('peer {0} seems dead, removing it from DNS '
-                                   .format(otherAddr))
+                    logger.error('peer {0} seems dead, removing it from DNS '
+                                 .format(otherAddr))
                     dns.delARecord(fqdn, otherAddr)
                     # Only remove one peer at a time; then force a self-check
                     break
