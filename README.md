@@ -119,14 +119,15 @@ check:
 
 ## Timer
 
-The timer schedules the checks: how often they should be run, and what should be the timeout. It must expose two methods:
+The timer schedules the checks: how often they should be run, what should be the timeout, and how many times a check should be attempted before declaring it failed. It must expose those methods:
 
 * getNextCheckTime(): returns the UNIX timestamp at which the next check should be executed;
 * getCheckTimeout(): returns the time alloted to the check to execute (once this time is elapsed, the check is considered as failed).
+* getRetry(): returns the number of times that a check should report an error before it is considered as really failing. 
 
 ### TickTimer
 
-This implementation schedules a check at regular intervals with a fixed timeout.
+This implementation schedules a check at regular intervals with a fixed timeout and a constant number of tries.
 
 ## Logger
 

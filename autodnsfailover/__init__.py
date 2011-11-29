@@ -92,9 +92,10 @@ class TickTimer(object):
     The *timeout* is fixed.
     """
 
-    def __init__(self, interval, timeout):
+    def __init__(self, interval, timeout, retry):
         self.interval = interval
         self.timeout = timeout
+        self.retry = retry
         self.last = 0
 
     def getNextCheckTime(self):
@@ -113,6 +114,9 @@ class TickTimer(object):
 
     def getCheckTimeout(self):
         return self.timeout
+
+    def getRetry(self):
+        return self.retry
 
 
 def boundedCheck(target, check, timer, logger):
@@ -174,6 +178,24 @@ def boundedCheck(target, check, timer, logger):
             exit(2)
         
 
+def retryBoundedCheck(target, check, timer, logger):
+    retry = timer.getRetry()
+    failed = 0
+    while True:
+        if boundedCheck(target, check, timer, logger):
+            # Success!
+            if failed:
+                # If there were previous failures, log them.
+                logger.info('Check failed {0} time(s) before passing.'
+                            .format(failed))
+            return True
+        failed += 1
+        if failed >= retry:
+            logger.info('Check failed {0} times. Giving up.'
+                        .format(failed))
+            return False
+        
+
 def run(fqdn, ipaddr, dns, check, timer, logger):
     """
     This is the "main loop". It will repeatedly retrieve our public
@@ -200,7 +222,7 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
             ownAddr = newOwnAddr
             logger.info('my IP address seems to be {0}'.format(ownAddr))
         logger.debug('doing self-check')
-        if not boundedCheck(ownAddr, check, timer, logger):
+        if not retryBoundedCheck(ownAddr, check, timer, logger):
             logger.critical('self-check failed; waiting 60s and exitting')
             # Don't restart immediately, to avoid a burst of error messages
             time.sleep(60)
@@ -218,7 +240,7 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
         # (to avoid a race condition where all peers could be removed
         # simultaneously if something is wrong in the check logic itself)
         for otherAddr in sorted(records):
-            if not boundedCheck(otherAddr, check, timer, logger):
+            if not retryBoundedCheck(otherAddr, check, timer, logger):
                 if len(records)<2:
                     logger.warning('peer {0} seems dead, but it will not '
                                    'be removed since it is the last peer'

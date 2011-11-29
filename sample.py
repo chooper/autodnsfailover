@@ -18,7 +18,7 @@ dns = autodnsfailover.ZerigoDns('zerigo@example.com',
 check = autodnsfailover.HttpCheck()
 
 # Implementation to be used for timing parameters (how often to run the checks)
-timer = autodnsfailover.TickTimer(10, 2)
+timer = autodnsfailover.TickTimer(10, 2, 3)
 
 # Logger to use (this one will be pretty verbose and log to stdout/stderr)
 logging.basicConfig(level=logging.DEBUG)
