@@ -23,7 +23,7 @@ Of course, your DNS record TTL should be as low as possible, to make sure that f
 You will need:
 
 * a Zerigo account with your DNS zones (or to write an appropriate "DNS" class implementation to dynamically update your DNS records);
-* to write a script (see the sample.py script for an example), with your credentials, the name of the DNS entry to update, and a few other details;
+* to write a script (see the sample1.py script for an example), with your credentials, the name of the DNS entry to update, and a few other details;
 * to arrange this script to be run automatically, and restarted automatically (it will exit when it fails to check itself correctly).
 
 Since our servers all have a Supervisor infrastructure, we manage the autodnsfailover daemon with a small supervisord.conf snippet, but you could also use e.g. start-stop-daemon or whatever you like. The script stays in foreground by default.
@@ -38,6 +38,17 @@ If for some reason, the check logic itself is broken, you could end up in a situ
 * if there is only one record, it won't be removed.
 
 This is not 100% bullet-proof (there are scenarios where a bad timing could cause peers to remove each others) but it should at least prevent basic fsck-ups.
+
+# Advanced example
+
+Check sample2.py for examples of more advanced options:
+
+* it sets the hostname of your server as a note attached to Zerigo record,
+* assuming you run on EC2, it retrieves your IP address using EC2 internal API,
+* the check is done on a specific virtualhost (assumed to be a very simple and stable static service),
+* local logs have timestamps, and additionnally, messages of priority ERROR and CRITICAL are sent by e-mail.
+
+This is almost exactly the setup used at dotCloud.
 
 # Interfaces
 
