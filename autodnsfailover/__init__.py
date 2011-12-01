@@ -16,11 +16,13 @@ class ZerigoDns(object):
     sub-optimal, but keep in mind that we need to make sure that we always
     see the latest version of the zone.
     """
-    def __init__(self, user, key, zone):
+    def __init__(self, user, key, zone, notes=None, ttl=60):
         self.user = user
         self.key = key
         self.zone = zone
-
+        self.notes = notes
+        self.ttl = ttl
+        
     @property
     def _zone(self):
         return zerigodns.NSZone(self.user, self.key).find_by_domain(self.zone)
@@ -38,7 +40,11 @@ class ZerigoDns(object):
 
     def addARecord(self, fqdn, a):
         hostname = self._hostname(fqdn)
-        self._zone.create_host(dict(hostname=hostname, host_type='A', data=a))
+        self._zone.create_host(dict(hostname=hostname,
+                                    ttl=self.ttl,
+                                    notes=self.notes,
+                                    host_type='A',
+                                    data=a))
 
     def delARecord(self, fqdn, a):
         hostname = self._hostname(fqdn)
