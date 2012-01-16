@@ -73,11 +73,13 @@ class HttpCheck(object):
     Check that a given HTTP test request can be done correctly.
     """
     def __init__(self, method='GET', url='/', body=None, headers={},
-                 port=80, useHttps=False, validStatusCodes=[200,302]):
+                 port=None, useHttps=False, validStatusCodes=[200,302]):
         self.method = method
         self.url = url
         self.body = body
         self.headers = headers
+        if not port:
+            port = 80 if not useHttps else 443
         self.port = port
         self.useHttps = useHttps
         self.validStatusCodes = validStatusCodes
