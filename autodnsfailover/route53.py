@@ -67,7 +67,7 @@ class Route53Dns(object):
         records = list(set(records))
 
         # create new A record
-        change = changes.add_change("CREATE", fqdn, "A")
+        change = changes.add_change("CREATE", fqdn, "A", self.ttl)
 
         # re-apply A records
         for record in records:
