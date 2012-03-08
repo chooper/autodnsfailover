@@ -85,8 +85,9 @@ class Route53Dns(object):
         records = []
         if resource:
             # update record
-            change = changes.add_change("DELETE", fqdn, "A")
             records = self.getARecords(fqdn)
+            ttl = [r.ttl for r in self._resources(fqdn) if r.type == 'A'][0]
+            change = changes.add_change("DELETE", fqdn, "A", ttl)
             for record in records:
                 change.add_value(record)
 
