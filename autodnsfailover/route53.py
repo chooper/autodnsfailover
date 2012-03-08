@@ -41,9 +41,10 @@ class Route53Dns(object):
                 if h.name==fqdn]
 
     def getARecords(self, fqdn):
-        return [h.resource_records
+        records = [h.resource_records
                 for h in self._resources(fqdn)
-                if h.type == 'A'][0]
+                if h.type == 'A']
+        return records[0] if len(records) > 0 else []
 
     def addARecord(self, fqdn, a):
         resource = self._resources(fqdn)
