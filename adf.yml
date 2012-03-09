@@ -1,0 +1,4 @@
+fqdn:
+    - bar.example.com.
+    - /-[0-9]+\././
+

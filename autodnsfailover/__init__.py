@@ -203,13 +203,16 @@ def retryBoundedCheck(target, check, timer, logger):
             return False
         
 
-def run(fqdn, ipaddr, dns, check, timer, logger):
+def run(fqdns, ipaddr, dns, check, timer, logger):
     """
     This is the "main loop". It will repeatedly retrieve our public
     IP address (it does it each time, in case it changed - this can
     happen with EC2 elastic IPs), add it to the DNS, then check
     that the machines pointed by the other DNS records are fine.
     """
+    if not isinstance(fqdns, list):
+        fqdns = [fqdns]
+
     logger.info('autodnsfailover starting')
     ownAddr = None
     while True:
@@ -235,28 +238,30 @@ def run(fqdn, ipaddr, dns, check, timer, logger):
             time.sleep(60)
             exit(-1)
         logger.debug('self-check passed')
-        logger.debug('getting DNS records')
-        records = dns.getARecords(fqdn)
-        logger.debug('DNS records: {0}'.format(records))
-        if ownAddr not in records:
-            logger.info('adding myself ({0}) into DNS'.format(ownAddr))
-            dns.addARecord(fqdn, ownAddr)
-            logger.warning('added myself ({0}) into DNS'.format(ownAddr))
-        logger.debug('checking other peers')
-        # Make sure that all peers check each others in the same order
-        # (to avoid a race condition where all peers could be removed
-        # simultaneously if something is wrong in the check logic itself)
-        for otherAddr in sorted(records):
-            if not retryBoundedCheck(otherAddr, check, timer, logger):
-                if len(records)<2:
-                    logger.error('peer {0} seems dead, but it will not '
-                                 'be removed since it is the last peer'
-                                 .format(otherAddr))
+        for fqdn in fqdns:
+            logger.debug('getting DNS records')
+            records = dns.getARecords(fqdn)
+            logger.debug('DNS records: {0}'.format(records))
+            if ownAddr not in records:
+                logger.info('adding myself ({0}) into DNS'.format(ownAddr))
+                dns.addARecord(fqdn, ownAddr)
+                logger.warning('added myself ({0}) into DNS'.format(ownAddr))
+            logger.debug('checking other peers')
+            # Make sure that all peers check each others in the same order
+            # (to avoid a race condition where all peers could be removed
+            # simultaneously if something is wrong in the check logic itself)
+            for otherAddr in sorted(records):
+                if not retryBoundedCheck(otherAddr, check, timer, logger):
+                    if len(records)<2:
+                        logger.error('peer {0} seems dead, but it will not '
+                                     'be removed since it is the last peer'
+                                     .format(otherAddr))
+                    else:
+                        logger.error('peer {0} seems dead, removing it from DNS '
+                                     .format(otherAddr))
+                        dns.delARecord(fqdn, otherAddr)
+                        # Only remove one peer at a time; then force a self-check
+                        break
                 else:
-                    logger.error('peer {0} seems dead, removing it from DNS '
-                                 .format(otherAddr))
-                    dns.delARecord(fqdn, otherAddr)
-                    # Only remove one peer at a time; then force a self-check
-                    break
-            else:
-                logger.debug('peer {0} seems alive'.format(otherAddr))
+                    logger.debug('peer {0} seems alive'.format(otherAddr))
+
