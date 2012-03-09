@@ -50,6 +50,8 @@ Check sample2.py for examples of more advanced options:
 
 This is almost exactly the setup used at dotCloud.
 
+sample3.py is an extension of sample2.py. Instead of using Zerigo DNS, it uses Amazon's Route53 and supports the use of a YAML-based config file.
+
 # Interfaces
 
 The interfaces marked "TBD" are not implemented, but we acknowledge that they would probably be very useful to others, and that they should be pretty straightforward to implement.
@@ -70,9 +72,7 @@ ZerigoDns is the reference class for this interface. It is useful only if your z
 
 ### Boto
 
-TBD.
-
-A boto implementation (allowing to update records located on AWS Route53) could be useful, but the current interface is still a bit rough (it involves generating queries directly in XML).
+A boto implementation (allowing to update records located on AWS Route53) is now available! See sample3.py for an example of how to use it.
 
 ### DDNS
 
