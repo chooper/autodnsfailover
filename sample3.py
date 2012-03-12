@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import autodnsfailover
+import autodnsfailover.route53
 import os
 import logging
 import logging.handlers
@@ -9,7 +10,9 @@ import re
 import yaml
 
 
-def load_config(cfg_file = 'adf.yml', hostname=socket.gethostname():
+hostname = socket.gethostname().split('.')[0]
+
+def load_config(hostname, cfg_file = 'adf.yml'):
     """Loads a list of FQDNs from a yaml file.
 
     Format is like:
@@ -23,18 +26,18 @@ def load_config(cfg_file = 'adf.yml', hostname=socket.gethostname():
     Also note that the "replacement" half of the regex is not escaped.
     """
 
-    managed_fqdns = []
-
     if not os.path.exists(cfg_file):
         print 'Config file {0} does not exist!'.format(cfg_file)
         return []
+
+    managed_fqdns = []
+    hostname = socket.gethostname().split('.')[0]
+
     with open(cfg_file,'r') as cfg_fd:
         config = yaml.load(cfg_fd.read())
 
     fqdns = config.get('fqdn', [])
-
     for fqdn in fqdns:
-
         # start sed-ish substitution
         if fqdn.startswith('/') and fqdn.endswith('/'):
             partitions = fqdn.split('/')
@@ -47,10 +50,9 @@ def load_config(cfg_file = 'adf.yml', hostname=socket.gethostname():
     return managed_fqdns
 
 
-managed_fqdns = load_config()
+managed_fqdns = load_config(hostname)
 
 if not managed_fqdns:
-    hostname = socket.gethostname().split('.')[0]
     basename = hostname.rsplit('-', 1)[0]
     fqdn = basename + '.' + os.environ.get('ADF_ZONE')
     managed_fqdns = [fqdn]
