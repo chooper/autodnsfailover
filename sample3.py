@@ -9,7 +9,7 @@ import re
 import yaml
 
 
-def load_config(cfg_file = 'adf.yml'):
+def load_config(cfg_file = 'adf.yml', hostname=socket.gethostname():
     """Loads a list of FQDNs from a yaml file.
 
     Format is like:
@@ -25,30 +25,35 @@ def load_config(cfg_file = 'adf.yml'):
 
     managed_fqdns = []
 
-    if os.path.exists(cfg_file):
-        hostname = socket.gethostname()
+    if not os.path.exists(cfg_file):
+        print 'Config file {0} does not exist!'.format(cfg_file)
+        return []
+    with open(cfg_file,'r') as cfg_fd:
+        config = yaml.load(cfg_fd.read())
 
-        with open(cfg_file,'r') as cfg_fd:
-            config = yaml.load(cfg_fd.read())
+    fqdns = config.get('fqdn', [])
 
-        fqdns = config.get('fqdn', [])
+    for fqdn in fqdns:
 
-        for fqdn in fqdns:
-            if fqdn.startswith('/') and fqdn.endswith('/'):  # sed-like substitution
-                partitions = fqdn.split('/')
-                start, pattern, replace, end = partitions[:4]  # there shouldn't be any more than 3, anyway
-                fqdn = re.sub(pattern, replace, hostname)
+        # start sed-ish substitution
+        if fqdn.startswith('/') and fqdn.endswith('/'):
+            partitions = fqdn.split('/')
+            start, pattern, replace, end = partitions[:4]
+            fqdn = re.sub(pattern, replace, hostname)
 
-            fqdn = fqdn if fqdn.endswith('.') else '{0}.'.format(fqdn)
-            managed_fqdns.append(fqdn)
-    else:
-        hostname = socket.gethostname().split('.')[0]
-        basename = hostname.rsplit('-', 1)[0]
-        fqdn = basename + '.' + os.environ.get('ADF_ZONE')
+        fqdn = fqdn if fqdn.endswith('.') else '{0}.'.format(fqdn)
         managed_fqdns.append(fqdn)
+
+    return managed_fqdns
 
 
 managed_fqdns = load_config()
+
+if not managed_fqdns:
+    hostname = socket.gethostname().split('.')[0]
+    basename = hostname.rsplit('-', 1)[0]
+    fqdn = basename + '.' + os.environ.get('ADF_ZONE')
+    managed_fqdns = [fqdn]
 
 ipaddr = autodnsfailover.WhatIsMyAddr(
     'http://169.254.169.254/latest/meta-data/public-ipv4')
