@@ -8,7 +8,7 @@ import signal
 import time
 import urllib
 import zerigodns
-import route53
+#import route53
 
 class ZerigoDns(object):
     """
