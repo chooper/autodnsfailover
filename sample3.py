@@ -8,30 +8,47 @@ import socket
 import re
 import yaml
 
-managed_fqdns = []
-cfg_file = 'adf.yml'
 
-if os.path.exists(cfg_file):
-    hostname = socket.gethostname()
+def load_config(cfg_file = 'adf.yml'):
+    """Loads a list of FQDNs from a yaml file.
 
-    with open(cfg_file,'r') as cfg_fd:
-        config = yaml.load(cfg_fd.read())
+    Format is like:
 
-    fqdns = config.get('fqdn', [])
+    fqdn:
+        - bar.example.com.
+        - /-[0-9]+\././
 
-    for fqdn in fqdns:
-        if fqdn.startswith('/') and fqdn.endswith('/'):  # sed-like substitution
-            partitions = fqdn.split('/')
-            start, pattern, replace, end = partitions[:4]  # there shouldn't be any more than 3, anyway
-            fqdn = re.sub(pattern, replace, hostname)
 
-        fqdn = fqdn if fqdn.endswith('.') else '{0}.'.format(fqdn)
+    Note that in the last case, we are doing a sed-like string replacement.
+    Also note that the "replacement" half of the regex is not escaped.
+    """
+
+    managed_fqdns = []
+
+    if os.path.exists(cfg_file):
+        hostname = socket.gethostname()
+
+        with open(cfg_file,'r') as cfg_fd:
+            config = yaml.load(cfg_fd.read())
+
+        fqdns = config.get('fqdn', [])
+
+        for fqdn in fqdns:
+            if fqdn.startswith('/') and fqdn.endswith('/'):  # sed-like substitution
+                partitions = fqdn.split('/')
+                start, pattern, replace, end = partitions[:4]  # there shouldn't be any more than 3, anyway
+                fqdn = re.sub(pattern, replace, hostname)
+
+            fqdn = fqdn if fqdn.endswith('.') else '{0}.'.format(fqdn)
+            managed_fqdns.append(fqdn)
+    else:
+        hostname = socket.gethostname().split('.')[0]
+        basename = hostname.rsplit('-', 1)[0]
+        fqdn = basename + '.' + os.environ.get('ADF_ZONE')
         managed_fqdns.append(fqdn)
-else:
-    hostname = socket.gethostname().split('.')[0]
-    basename = hostname.rsplit('-', 1)[0]
-    fqdn = basename + '.' + os.environ.get('ADF_ZONE')
-    managed_fqdns.append(fqdn)
+
+
+managed_fqdns = load_config()
 
 ipaddr = autodnsfailover.WhatIsMyAddr(
     'http://169.254.169.254/latest/meta-data/public-ipv4')
