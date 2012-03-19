@@ -17,12 +17,16 @@ def load_config(hostname, cfg_file = 'adf.yml'):
 
     Format is like:
 
+    zone: example.com
+    provider:
+        type: route53
+        access_key: aws_access_key
+        secret_key: aws_secret_key
     fqdn:
-        - bar.example.com.
-        - /-[0-9]+\././
+        - /-[0-9]+//
 
 
-    Note that in the last case, we are doing a sed-like string replacement.
+    Note that in the last case of fqdns, we are doing a sed-like string replacement.
     Also note that the "replacement" half of the regex is not escaped.
     """
 
@@ -31,7 +35,6 @@ def load_config(hostname, cfg_file = 'adf.yml'):
         return []
 
     managed_fqdns = []
-    hostname = socket.gethostname().split('.')[0]
 
     with open(cfg_file,'r') as cfg_fd:
         config = yaml.load(cfg_fd.read())
@@ -42,29 +45,41 @@ def load_config(hostname, cfg_file = 'adf.yml'):
         if fqdn.startswith('/') and fqdn.endswith('/'):
             partitions = fqdn.split('/')
             start, pattern, replace, end = partitions[:4]
-            fqdn = re.sub(pattern, replace, hostname)
+            fqdn = re.sub(pattern, replace, hostname)+'.'+config['zone']
 
-        fqdn = fqdn if fqdn.endswith('.') else '{0}.'.format(fqdn)
         managed_fqdns.append(fqdn)
 
-    return managed_fqdns
+    # overwrite config with resolved RRs
+    config['fqdn'] = managed_fqdns
+
+    return config
 
 
-managed_fqdns = load_config(hostname)
+config = load_config(hostname)
+managed_fqdns = config['fqdn']
 
 if not managed_fqdns:
     basename = hostname.rsplit('-', 1)[0]
-    fqdn = basename + '.' + os.environ.get('ADF_ZONE')
+    fqdn = basename + config['zone']
     managed_fqdns = [fqdn]
 
 ipaddr = autodnsfailover.WhatIsMyAddr(
     'http://169.254.169.254/latest/meta-data/public-ipv4')
 
-dns = autodnsfailover.route53.Route53Dns(os.environ.get('ADF_ACCESS_KEY_ID',''),
-                                os.environ.get('ADF_SECRET_ACCESS_KEY',''),
-                                os.environ.get('ADF_ZONE',''),
-                                hostname,
-                                60)
+if config['provider']['type'] == 'route53':
+    dns = autodnsfailover.route53.Route53Dns(config['provider']['access_key'],
+                                    config['provider']['secret_key'],
+                                    config['zone'],
+                                    notes='',
+                                    ttl=60)
+elif config['provider']['type'] == 'zerigodns':
+    dns = autodnsfailover.ZerigoDns(config['provider']['username'],
+                                    config['provider']['password'],
+                                    config['zone'],
+                                    hostname,
+                                    60)
+else:
+    raise ValueError("Unknown provider from config file")
 
 check = autodnsfailover.HttpCheck(headers={'Host':'ping.example.com'})
 
@@ -77,14 +92,14 @@ consoleLogger.setLevel(logging.WARNING)
 consoleLogger.setFormatter(logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(consoleLogger)
-#emailLogger = logging.handlers.SMTPHandler(
-#    'smtp.example.com',
-#    'sysadmin+autodnsfailover@example.com',
-#    ['sysadmin+autodnsfailover@example.com'],
-#    'autodnsfailover@{0} - notification about {1}'.format(hostname, fqdn)
-#    )
-#emailLogger.setLevel(logging.ERROR)
-#logger.addHandler(emailLogger)
+emailLogger = logging.handlers.SMTPHandler(
+    'smtp.example.com',
+    'sysadmin+autodnsfailover@example.com',
+    ['sysadmin+autodnsfailover@example.com'],
+    'autodnsfailover@{0} - notification about {1}'.format(hostname, fqdn)
+    )
+emailLogger.setLevel(logging.ERROR)
+logger.addHandler(emailLogger)
 
 if __name__=='__main__':
     autodnsfailover.run(managed_fqdns, ipaddr, dns, check, timer, logger)

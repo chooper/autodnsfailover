@@ -36,17 +36,20 @@ class Route53Dns(object):
         return None
 
     def _resources(self, fqdn):
+        fqdn = fqdn if fqdn.endswith('.') else fqdn+'.'
         return [h
                 for h in self._zone
                 if h.name==fqdn]
 
     def getARecords(self, fqdn):
+        fqdn = fqdn if fqdn.endswith('.') else fqdn+'.'
         records = [h.resource_records
                 for h in self._resources(fqdn)
                 if h.type == 'A']
         return records[0] if len(records) > 0 else []
 
     def addARecord(self, fqdn, a):
+        fqdn = fqdn if fqdn.endswith('.') else fqdn+'.'
         resource = self._resources(fqdn)
 
         changes = boto.route53.record.ResourceRecordSets(self._conn,
@@ -77,6 +80,7 @@ class Route53Dns(object):
 
 
     def delARecord(self, fqdn, a):
+        fqdn = fqdn if fqdn.endswith('.') else fqdn+'.'
         resource = self._resources(fqdn)
 
         changes = boto.route53.record.ResourceRecordSets(self._conn,
