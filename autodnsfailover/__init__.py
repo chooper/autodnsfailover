@@ -210,7 +210,7 @@ def run(fqdns, ipaddr, dns, check, timer, logger):
     happen with EC2 elastic IPs), add it to the DNS, then check
     that the machines pointed by the other DNS records are fine.
     """
-    if not isinstance(fqdns, list):
+    if isinstance(fqdns, basestring):
         fqdns = [fqdns]
 
     logger.info('autodnsfailover starting')
